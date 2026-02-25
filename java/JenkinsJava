@@ -25,9 +25,10 @@ pipeline  {
                         cd fruits-veg_market/java;
                         sudo yum install java-17-amazon-corretto -y;
                         sudo yum install maven -y;
-                        mvn spring-boot:run -Dspring-boot.run.arguments="--server.address=0.0.0.0 --server.port=8080" &
+                        mvn spring-boot:run -Dspring-boot.run.arguments="--server.address=0.0.0.0 --server.port=8080";
                         sudo cp vegetables.service /etc/systemd/system/vegetables.service;
                         sudo systemctl  daemon-reload;
+                        sudo systemctl enable vegetables.service;
                         sudo systemctl restart vegetables.service 
                         
 ' 
