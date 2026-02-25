@@ -1,40 +1,61 @@
-pipeline  {
+pipeline {
     agent any 
-    
-    
+
     parameters {
         string (
             name: 'TARGET_IP',
             defaultValue: '172.31.24.209',
-            description: 'Enter  the traget EC2 IP address'
+            description: 'Enter the target EC2 IP address'
         )
     }
-    
+
     stages {
-        
-        stage ('Install Packages   SSH') {
-            
+        stage ('Deploy Java App') {
             steps {
                 sshagent (credentials: ['AWS-SSH-KEY']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ec2-user@${params.TARGET_IP}  '
-                        sudo yum install git -y; 
-                        cd ~;
-                        rm -rf fruits-veg_market;
-                        git clone https://github.com/techbleat/fruits-veg_market.git;
-                        cd fruits-veg_market/java;
-                        sudo yum install java-17-amazon-corretto -y;
-                        sudo yum install maven -y;
-                        mvn spring-boot:run -Dspring-boot.run.arguments="--server.address=0.0.0.0 --server.port=8080";
-                        sudo cp vegetables.service /etc/systemd/system/vegetables.service;
-                        sudo systemctl  daemon-reload;
-                        sudo systemctl enable vegetables.service;
-                        sudo systemctl restart vegetables.service 
+                        ssh -o StrictHostKeyChecking=no ec2-user@${params.TARGET_IP} '
                         
-' 
+                        # Install dependencies
+                        sudo yum install git -y
+                        sudo yum install java-17-amazon-corretto -y
+                        sudo yum install maven -y
+
+                        # Clone repo
+                        cd ~
+                        rm -rf fruits-veg_market
+                        git clone https://github.com/techbleat/fruits-veg_market.git
+                        cd fruits-veg_market/java
+
+                        # Build project
+                        mvn clean package
+
+                        # Create systemd service file
+                        sudo tee /etc/systemd/system/vegetables.service > /dev/null <<EOF
+[Unit]
+Description=Vegetables Spring Boot App
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/fruits-veg_market/java
+ExecStart=/usr/bin/java -jar /home/ec2-user/fruits-veg_market/java/target/produce-app-0.0.1-SNAPSHOT.jar --server.address=0.0.0.0 --server.port=8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+                        # Reload systemd and start service
+                        sudo systemctl daemon-reload
+                        sudo systemctl enable vegetables.service
+                        sudo systemctl restart vegetables.service
+                        sudo systemctl status vegetables.service --no-pager
+                        '
                     """
                 }
-
             }
         }
     }
