@@ -1,0 +1,40 @@
+pipeline  {
+    agent any 
+    
+    
+    parameters {
+        string (
+            name: 'TARGET_IP',
+            defaultValue: '172.31.24.209',
+            description: 'Enter  the traget EC2 IP address'
+        )
+    }
+    
+    stages {
+        
+        stage ('Install Packages   SSH') {
+            
+            steps {
+                sshagent (credentials: ['AWS-SSH-KEY']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ec2-user@${params.TARGET_IP}  '
+                        sudo yum install git -y; 
+                        cd ~;
+                        rm -rf fruits-veg_market;
+                        git clone https://github.com/techbleat/fruits-veg_market.git;
+                        cd fruits-veg_market/java;
+                        sudo yum install java-17-amazon-corretto -y;
+                        sudo yum install maven -y;
+                        mvn spring-boot:run -Dspring-boot.run.arguments="--server.address=0.0.0.0 --server.port=8080" &
+                        sudo cp vegetables.service /etc/systemd/system/vegetables.service;
+                        sudo systemctl  daemon-reload;
+                        sudo systemctl restart vegetables.service 
+                        
+' 
+                    """
+                }
+
+            }
+        }
+    }
+}
