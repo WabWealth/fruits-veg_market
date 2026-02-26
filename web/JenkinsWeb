@@ -1,0 +1,48 @@
+pipeline {
+    agent any 
+
+    parameters {
+        string (
+            name: 'PYTHON_NODE',
+            defaultValue: 'ec2-63-32-57-178.eu-west-1.compute.amazonaws.com',
+            description: 'Enter target EC2 Node for Python APP'
+        )
+        string (
+            name: 'JAVA_NODE',
+            defaultValue: 'ec2-18-203-87-78.eu-west-1.compute.amazonaws.com',
+            description: 'Enter target EC2 Node for Java APP'
+        )
+        string (
+            name: 'WEB_NODE',
+            defaultValue: 'ec2-108-131-217-7.eu-west-1.compute.amazonaws.com',
+            description: 'Enter target EC2 Node for Web APP'
+        )
+    }
+
+    stages {
+
+        stage ('Deploy Web Frontend') {
+            steps {
+                sshagent (credentials: ['AWS-SSH-KEY']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ec2-user@${WEB_NODE} '
+                            sudo yum install git -y
+                            sudo yum install nginx -y
+                            sudo systemctl start nginx
+                            cd ~
+                            rm -rf fruits-veg_market
+                            git clone https://github.com/techbleat/fruits-veg_market.git
+                            cd fruits-veg_market/web
+                            # Replace placeholders with actual EC2 hostnames
+                            sed -i "s|FRUIT_MACHINE|${PYTHON_NODE}|g" index.html
+                            sed -i "s|VEG_MACHINE|${JAVA_NODE}|g" index.html
+                            sudo cp index.html /usr/share/nginx/html/
+                            sudo systemctl restart nginx
+                        '
+                    """
+                }
+            }
+        }
+
+    }
+}
