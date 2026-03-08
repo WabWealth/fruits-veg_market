@@ -1,0 +1,7 @@
+# Copy to backend.hcl and set your bucket name
+# Create bucket first: aws s3 mb s3://techbleat-tfstate-YOUR_ACCOUNT_ID --region eu-west-1
+
+bucket         = "techbleat-tfstate-YOUR_ACCOUNT_ID"
+key            = "techbleat/terraform.tfstate"
+region         = "eu-west-1"
+dynamodb_table = "techbleat-tfstate-lock"

@@ -1,0 +1,17 @@
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfplan
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/crash.*.log
+
+# AWS
+*.pem
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

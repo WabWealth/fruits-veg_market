@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Optional, List
 
@@ -10,10 +11,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 
 # -----------------------------
-# DATABASE CONFIG
+# DATABASE CONFIG (from env - injected by CI/CD)
 # -----------------------------
-DATABASE_URL = (
-    "postgresql+psycopg://user:pass@db.server:5432/postgres"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+psycopg://user:pass@localhost:5432/postgres"  # local dev fallback
 )
 
 engine = create_engine(
