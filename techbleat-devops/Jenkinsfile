@@ -119,7 +119,10 @@ pipeline {
                     scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras install nginx1 -y"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip docker"
+
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable docker"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start docker"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx"
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start nginx"
@@ -134,7 +137,7 @@ pipeline {
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable fastapi && sudo systemctl restart fastapi 2>/dev/null || sudo systemctl start fastapi"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx && sudo systemctl restart nginx 2>/dev/null || sudo systemctl start nginx"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart nginx"
 
                     echo "Setting up Let's Encrypt HTTPS for \$DOMAIN ..."
 
@@ -142,11 +145,8 @@ pipeline {
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Install Certbot via pip (certbot/certbot-nginx not in Amazon Linux 2 default repos)
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo pip3 install certbot certbot-nginx"
-
-                    # Use full path - pip installs to /usr/local/bin which may not be in sudo PATH
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo /usr/local/bin/certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
+                    # Use Docker Certbot (avoids Python/OpenSSL issues)
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo docker run --rm -p 80:80 -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot certonly --standalone -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
                     echo "Deployment complete!"
                     echo "Visit: https://\$DOMAIN"
