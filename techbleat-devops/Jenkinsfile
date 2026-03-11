@@ -119,10 +119,7 @@ pipeline {
                     scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras install nginx1 -y"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip docker"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable docker"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start docker"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx"
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start nginx"
@@ -141,12 +138,16 @@ pipeline {
 
                     echo "Setting up Let's Encrypt HTTPS for \$DOMAIN ..."
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP 'sudo sed -i "s/server_name _/server_name '"\$DOMAIN"'/" /etc/nginx/conf.d/techbleat.conf'
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i \\"s/server_name _/server_name \$DOMAIN/\\" /etc/nginx/conf.d/techbleat.conf"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Use Docker Certbot (avoids Python/OpenSSL issues)
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo docker run --rm -p 80:80 -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot certonly --standalone -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
+                    # Install certbot using pip
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install --upgrade pip"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo pip3 install certbot certbot-nginx"
+
+                    # Run certbot with nginx plugin
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo /usr/local/bin/certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
                     echo "Deployment complete!"
                     echo "Visit: https://\$DOMAIN"
