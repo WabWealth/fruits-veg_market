@@ -145,7 +145,8 @@ pipeline {
                     # Install Certbot via pip (certbot/certbot-nginx not in Amazon Linux 2 default repos)
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo pip3 install certbot certbot-nginx"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
+                    # Use full path - pip installs to /usr/local/bin which may not be in sudo PATH
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo /usr/local/bin/certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
                     echo "Deployment complete!"
                     echo "Visit: https://\$DOMAIN"
