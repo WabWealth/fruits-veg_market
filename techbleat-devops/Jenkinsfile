@@ -142,10 +142,8 @@ pipeline {
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Install Certbot properly for Amazon Linux 2
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras enable epel"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum clean metadata"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
+                    # Install Certbot via pip (certbot/certbot-nginx not in Amazon Linux 2 default repos)
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo pip3 install certbot certbot-nginx"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
