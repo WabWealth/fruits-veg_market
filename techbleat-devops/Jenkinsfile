@@ -121,8 +121,7 @@ pipeline {
                         echo "Setting up Let's Encrypt HTTPS for \$DOMAIN ..."
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP 'sudo sed -i "s/server_name _/server_name '"\$DOMAIN"'/" /etc/nginx/conf.d/techbleat.conf'
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
-                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release"
-                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install certbot certbot-nginx"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
                         echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
                     """
