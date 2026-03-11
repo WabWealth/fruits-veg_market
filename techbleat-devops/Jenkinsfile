@@ -119,7 +119,7 @@ pipeline {
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx && sudo systemctl restart nginx 2>/dev/null || sudo systemctl start nginx"
 
                         echo "Setting up Let's Encrypt HTTPS for \$DOMAIN ..."
-                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i \"s/server_name _/server_name \$DOMAIN/\" /etc/nginx/conf.d/techbleat.conf"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP 'sudo sed -i "s/server_name _/server_name '"\$DOMAIN"'/" /etc/nginx/conf.d/techbleat.conf'
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python3-certbot-nginx 2>/dev/null || true"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
