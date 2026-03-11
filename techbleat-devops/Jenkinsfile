@@ -107,10 +107,10 @@ pipeline {
                         scp \$SSH_OPTS techbleat-devops/nginx/techbleat.conf ec2-user@\$EC2_IP:/tmp/techbleat.conf
                         scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
 
-                        ssh $SSH_OPTS ec2-user@$EC2_IP "sudo amazon-linux-extras install nginx1 -y"
-                        ssh $SSH_OPTS ec2-user@$EC2_IP "sudo yum install -y python3 python3-pip"
-                        ssh $SSH_OPTS ec2-user@$EC2_IP "sudo systemctl enable nginx"
-                        ssh $SSH_OPTS ec2-user@$EC2_IP "sudo systemctl start nginx"
+                        ssh \$SSH_OPTS ec2-user@$EC2_IP "sudo amazon-linux-extras install nginx1 -y"
+                        ssh \$SSH_OPTS ec2-user@$EC2_IP "sudo yum install -y python3 python3-pip"
+                        ssh \$SSH_OPTS ec2-user@$EC2_IP "sudo systemctl enable nginx"
+                        ssh \$SSH_OPTS ec2-user@$EC2_IP "sudo systemctl start nginx"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp -r /tmp/frontend-deploy/* /usr/share/nginx/html/"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/techbleat.conf /etc/nginx/conf.d/techbleat.conf"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "cd /home/ec2-user/app && python3 -m venv venv 2>/dev/null || true && ./venv/bin/pip install -r requirements.txt -q"
