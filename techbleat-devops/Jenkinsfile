@@ -140,20 +140,12 @@ pipeline {
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Install snapd
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y snapd"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable snapd"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start snapd"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo ln -s /var/lib/snapd/snap /snap || true"
-
-                    # Install certbot via snap
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo snap install core"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo snap refresh core"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo snap install --classic certbot"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo ln -s /snap/bin/certbot /usr/bin/certbot || true"
+                    # Install Certbot via pip (Amazon Linux compatible)
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install --upgrade pip"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install certbot certbot-nginx"
 
                     # Generate SSL certificate
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo /usr/local/bin/certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
                     echo "Deployment complete!"
                     echo "Visit: https://\$DOMAIN"
