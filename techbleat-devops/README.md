@@ -75,12 +75,18 @@ All deployment logic is **inline in the Jenkinsfile** – no external scripts. U
 6. Add credential: **SSH Username with private key**, ID: `techbleat-ec2-key` (for app deployment)
 7. Run with `DEPLOY_APP=true`, `DOMAIN_NAME` (e.g. `market.techbleat-stores.co.uk`), and `CERTBOT_EMAIL` – full deploy + HTTPS in one run
 
-**Fully automated:** DATABASE_URL from Terraform, Certbot for HTTPS. Uses **DuckDNS** for DNS (works without owning a domain).
+**Fully automated:** DATABASE_URL from Terraform, Certbot for HTTPS. Use **nip.io** (default) for instant HTTPS, or **DuckDNS** for a custom domain.
 
-**DuckDNS setup (one-time):**
+**For HTTPS (assignment requirement) – use nip.io:**
+1. Set `DOMAIN_NAME=nip.io` (default)
+2. Set `CERTBOT_EMAIL` to your email
+3. Run pipeline – nip.io provides instant DNS; Let's Encrypt validation usually succeeds
+4. Result: **https://54-246-163-138.nip.io** (your IP in dash notation)
+
+**Alternative – DuckDNS:**
 1. Create subdomain at [duckdns.org](https://duckdns.org) (e.g. `techbleat-market`)
 2. Add Jenkins credential: **Secret text**, ID: `duckdns-token`, value: your DuckDNS token
-3. Run with `DOMAIN_NAME=techbleat-market.duckdns.org` – pipeline auto-updates IP before Certbot
+3. Run with `DOMAIN_NAME=techbleat-market.duckdns.org`
 
 ## Production URL
 
@@ -88,10 +94,10 @@ All deployment logic is **inline in the Jenkinsfile** – no external scripts. U
 
 | Use (production) | Avoid |
 |------------------|-------|
-| `http://techbleat-market.duckdns.org` | `http://54.246.163.138` |
-| `http://techbleat-market.duckdns.org/api/products` | IP-based URLs |
+| `https://54-246-163-138.nip.io` (with nip.io) | `http://54.246.163.138` |
+| `https://techbleat-market.duckdns.org` (with DuckDNS) | IP-based URLs |
 
-The pipeline outputs the production URL. Share the domain with users – it is stable and production-ready. If Certbot succeeds, use `https://` instead.
+The pipeline outputs the production URL. With `DOMAIN_NAME=nip.io`, you get HTTPS via Let's Encrypt (assignment requirement).
 
 ## Customize
 

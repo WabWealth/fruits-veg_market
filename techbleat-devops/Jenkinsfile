@@ -17,8 +17,8 @@ pipeline {
         )
         string(
             name: 'DOMAIN_NAME',
-            defaultValue: 'techbleat-market.duckdns.org',
-            description: 'DuckDNS domain for HTTPS (e.g. techbleat-market.duckdns.org). Create at duckdns.org, add credential duckdns-token.'
+            defaultValue: 'nip.io',
+            description: 'Domain: use "nip.io" for instant HTTPS (recommended), or "techbleat-market.duckdns.org" for DuckDNS.'
         )
         string(
             name: 'CERTBOT_EMAIL',
@@ -62,7 +62,10 @@ pipeline {
 
         stage('Update DuckDNS') {
             when {
-                expression { return params.DEPLOY_APP }
+                allOf {
+                    expression { return params.DEPLOY_APP }
+                    expression { return params.DOMAIN_NAME?.contains('duckdns.org') }
+                }
             }
             steps {
                 withCredentials([string(credentialsId: 'duckdns-token', variable: 'DUCKDNS_TOKEN')]) {
@@ -88,8 +91,9 @@ pipeline {
                     if (!params.DOMAIN_NAME?.trim() || !params.CERTBOT_EMAIL?.trim()) {
                         error "DEPLOY_APP requires DOMAIN_NAME and CERTBOT_EMAIL"
                     }
-                    if (!params.DOMAIN_NAME.contains('duckdns.org')) {
-                        error "Use a DuckDNS domain (e.g. techbleat-market.duckdns.org). Create at duckdns.org and add credential duckdns-token."
+                    def d = params.DOMAIN_NAME?.trim()
+                    if (d != 'nip.io' && !d.contains('duckdns.org')) {
+                        error "Use DOMAIN_NAME=nip.io (for HTTPS) or techbleat-market.duckdns.org (DuckDNS)"
                     }
                 }
                 withCredentials([
@@ -104,7 +108,12 @@ pipeline {
                         EC2_IP=\$(terraform output -raw server_public_ip)
                         DB_URL=\$(terraform output -raw database_url)
                         cd ../..
-                        DOMAIN="${params.DOMAIN_NAME}"
+                        if [ "${params.DOMAIN_NAME}" = "nip.io" ]; then
+                          DOMAIN=\$(echo "\$EC2_IP" | tr '.' '-').nip.io
+                          echo "Using nip.io: \$DOMAIN (instant DNS, no propagation)"
+                        else
+                          DOMAIN="${params.DOMAIN_NAME}"
+                        fi
                         SSH_OPTS="-i \$SSH_KEY_PATH -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
                         echo "Deploying to \$EC2_IP (domain: \$DOMAIN) ..."
@@ -146,8 +155,12 @@ pipeline {
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release 2>/dev/null || true"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
 
-                        echo "Waiting 90s for DNS propagation before Certbot ..."
-                        sleep 90
+                        if [ "${params.DOMAIN_NAME}" != "nip.io" ]; then
+                          echo "Waiting 90s for DNS propagation before Certbot ..."
+                          sleep 90
+                        else
+                          echo "nip.io: no wait needed (instant resolution)"
+                        fi
 
                         echo "Requesting Let's Encrypt certificate for \$DOMAIN ..."
                         if ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"; then
@@ -180,12 +193,17 @@ pipeline {
         success {
             echo 'Pipeline completed successfully'
             script {
-                def domain = params.DOMAIN_NAME?.trim() ?: 'techbleat-market.duckdns.org'
+                def d = params.DOMAIN_NAME?.trim() ?: 'nip.io'
+                def domain = d
+                if (d == 'nip.io') {
+                    def ip = sh(script: 'cd techbleat-devops/terraform && terraform output -raw server_public_ip', returnStdout: true).trim()
+                    domain = ip.replace('.', '-') + '.nip.io'
+                }
                 echo ""
                 echo "=============================================="
-                echo "PRODUCTION URL (use this, not the IP):"
-                echo "  http://${domain}"
-                echo "  http://${domain}/api/products"
+                echo "PRODUCTION URL:"
+                echo "  https://${domain}"
+                echo "  https://${domain}/api/products"
                 echo "=============================================="
             }
             dir('techbleat-devops/terraform') {
