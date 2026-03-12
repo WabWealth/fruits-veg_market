@@ -146,11 +146,11 @@ pipeline {
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release 2>/dev/null || true"
                         ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
 
-                        echo "Waiting 45s for DNS propagation before Certbot ..."
-                        sleep 45
+                        echo "Waiting 90s for DNS propagation before Certbot ..."
+                        sleep 90
 
                         echo "Requesting Let's Encrypt certificate for \$DOMAIN ..."
-                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}" || sleep 60 && ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
 
                         echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
                     """
