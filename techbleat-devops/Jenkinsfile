@@ -140,12 +140,11 @@ pipeline {
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Install Certbot via pip (Amazon Linux compatible)
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install --upgrade pip"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo python3 -m pip install certbot certbot-nginx"
+                    # Install Certbot (Amazon Linux compatible)
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot"
 
                     # Generate SSL certificate
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo /usr/local/bin/certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
                     echo "Deployment complete!"
                     echo "Visit: https://\$DOMAIN"
