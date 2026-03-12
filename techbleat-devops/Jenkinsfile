@@ -1,6 +1,5 @@
 // -----------------------------------------------------------------------------
 // Techbleat Superstore - Jenkins CI/CD Pipeline
-// Assignment: Jenkins to manage Infrastructure and Application Deployments
 // -----------------------------------------------------------------------------
 
 pipeline {
@@ -14,17 +13,17 @@ pipeline {
         booleanParam(
             name: 'DEPLOY_APP',
             defaultValue: false,
-            description: 'Deploy application to EC2 after Terraform (requires SSH key credential)'
+            description: 'Deploy application to EC2 after Terraform'
         )
         string(
             name: 'DOMAIN_NAME',
             defaultValue: 'market.techbleat-stores.co.uk',
-            description: 'Domain for HTTPS (required when DEPLOY_APP=true)'
+            description: 'Domain for HTTPS'
         )
         string(
             name: 'CERTBOT_EMAIL',
             defaultValue: '',
-            description: 'Email for Let\'s Encrypt (required when DEPLOY_APP=true)'
+            description: 'Email for Let\'s Encrypt'
         )
     }
 
@@ -71,7 +70,7 @@ pipeline {
 
                 script {
                     if (!params.DOMAIN_NAME?.trim() || !params.CERTBOT_EMAIL?.trim()) {
-                        error "DEPLOY_APP requires DOMAIN_NAME and CERTBOT_EMAIL for full automation"
+                        error "DEPLOY_APP requires DOMAIN_NAME and CERTBOT_EMAIL"
                     }
                 }
 
@@ -102,8 +101,8 @@ pipeline {
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /home/ec2-user/app"
 
                     rsync -avz -e "ssh \$SSH_OPTS" \\
-                      --exclude venv --exclude __pycache__ --exclude .git \\
-                      backend-api/ ec2-user@\$EC2_IP:/home/ec2-user/app/
+                    --exclude venv --exclude __pycache__ --exclude .git \\
+                    backend-api/ ec2-user@\$EC2_IP:/home/ec2-user/app/
 
                     echo "DATABASE_URL=\$DB_URL" > /tmp/app.env
                     scp \$SSH_OPTS /tmp/app.env ec2-user@\$EC2_IP:/home/ec2-user/app/.env
@@ -112,8 +111,7 @@ pipeline {
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /tmp/frontend-deploy"
 
                     rsync -avz -e "ssh \$SSH_OPTS" \\
-                      --exclude nginx.conf_sample --exclude techbleat.conf \\
-                      frontend/ ec2-user@\$EC2_IP:/tmp/frontend-deploy/
+                    frontend/ ec2-user@\$EC2_IP:/tmp/frontend-deploy/
 
                     scp \$SSH_OPTS techbleat-devops/nginx/techbleat.conf ec2-user@\$EC2_IP:/tmp/techbleat.conf
                     scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
@@ -127,28 +125,28 @@ pipeline {
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp -r /tmp/frontend-deploy/* /usr/share/nginx/html/"
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/techbleat.conf /etc/nginx/conf.d/techbleat.conf"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "cd /home/ec2-user/app && python3 -m venv venv 2>/dev/null || true && ./venv/bin/pip install -r requirements.txt -q"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "cd /home/ec2-user/app && python3 -m venv venv 2>/dev/null || true && ./venv/bin/pip install -r requirements.txt"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/fastapi.service /etc/systemd/system/fastapi.service && sudo systemctl daemon-reload"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable fastapi && sudo systemctl restart fastapi 2>/dev/null || sudo systemctl start fastapi"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable fastapi"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart fastapi"
 
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart nginx"
 
-                    echo "Setting up Let's Encrypt HTTPS for \$DOMAIN ..."
+                    echo "Setting up HTTPS for \$DOMAIN"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i \\"s/server_name _/server_name \$DOMAIN/\\" /etc/nginx/conf.d/techbleat.conf"
-
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i 's/server_name _/server_name \$DOMAIN/' /etc/nginx/conf.d/techbleat.conf"
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    # Install Certbot (Amazon Linux compatible)
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot"
+                    # FINAL CERTBOT FIX
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras enable epel"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release"
+                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
 
-                    # Generate SSL certificate
                     ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
 
-                    echo "Deployment complete!"
+                    echo "Deployment complete"
                     echo "Visit: https://\$DOMAIN"
-                    echo "API: https://\$DOMAIN/api/products"
                     """
                 }
             }
