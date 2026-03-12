@@ -75,9 +75,12 @@ All deployment logic is **inline in the Jenkinsfile** – no external scripts. U
 6. Add credential: **SSH Username with private key**, ID: `techbleat-ec2-key` (for app deployment)
 7. Run with `DEPLOY_APP=true`, `DOMAIN_NAME` (e.g. `market.techbleat-stores.co.uk`), and `CERTBOT_EMAIL` – full deploy + HTTPS in one run
 
-**Fully automated:** DATABASE_URL from Terraform, Certbot for HTTPS. No manual steps.
+**Fully automated:** DATABASE_URL from Terraform, Certbot for HTTPS. Uses **DuckDNS** for DNS (works without owning a domain).
 
-**DNS (fully automated):** Set `domain_name = "market.techbleat-stores.co.uk"` in `terraform.tfvars`. Terraform creates the Route53 hosted zone + A record. One-time: set the 4 nameservers (from `terraform output route53_nameservers`) at your domain registrar. If domain is already in Route53, set `route53_zone_id` instead and leave zone creation to existing.
+**DuckDNS setup (one-time):**
+1. Create subdomain at [duckdns.org](https://duckdns.org) (e.g. `techbleat-market`)
+2. Add Jenkins credential: **Secret text**, ID: `duckdns-token`, value: your DuckDNS token
+3. Run with `DOMAIN_NAME=techbleat-market.duckdns.org` – pipeline auto-updates IP before Certbot
 
 ## Customize
 

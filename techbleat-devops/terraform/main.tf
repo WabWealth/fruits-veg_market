@@ -279,7 +279,7 @@ resource "aws_route53_zone" "main" {
 resource "aws_route53_record" "app" {
   count   = var.domain_name != "" ? 1 : 0
   zone_id = local.zone_id
-  name    = var.domain_name
+  name    = split(".", var.domain_name)[0]
   type    = "A"
   ttl     = 300
   records = [aws_instance.techbleat_server.public_ip]

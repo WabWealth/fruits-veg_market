@@ -17,8 +17,8 @@ pipeline {
         )
         string(
             name: 'DOMAIN_NAME',
-            defaultValue: 'market.techbleat-stores.co.uk',
-            description: 'Domain for HTTPS'
+            defaultValue: 'techbleat-market.duckdns.org',
+            description: 'DuckDNS domain for HTTPS (e.g. techbleat-market.duckdns.org). Create at duckdns.org, add credential duckdns-token.'
         )
         string(
             name: 'CERTBOT_EMAIL',
@@ -60,93 +60,99 @@ pipeline {
             }
         }
 
-        stage('Deploy Application') {
-
+        stage('Update DuckDNS') {
             when {
                 expression { return params.DEPLOY_APP }
             }
-
             steps {
+                withCredentials([string(credentialsId: 'duckdns-token', variable: 'DUCKDNS_TOKEN')]) {
+                    sh """
+                        set -e
+                        cd techbleat-devops/terraform
+                        EC2_IP=\$(terraform output -raw server_public_ip)
+                        SUBDOMAIN=\$(echo "${params.DOMAIN_NAME}" | cut -d. -f1)
+                        curl -s "https://www.duckdns.org/update?domains=\$SUBDOMAIN&token=\$DUCKDNS_TOKEN&ip=\$EC2_IP"
+                        echo ""
+                        echo "DuckDNS updated: \$SUBDOMAIN.duckdns.org -> \$EC2_IP"
+                    """
+                }
+            }
+        }
 
+        stage('Deploy Application') {
+            when {
+                expression { return params.DEPLOY_APP }
+            }
+            steps {
                 script {
                     if (!params.DOMAIN_NAME?.trim() || !params.CERTBOT_EMAIL?.trim()) {
                         error "DEPLOY_APP requires DOMAIN_NAME and CERTBOT_EMAIL"
                     }
+                    if (!params.DOMAIN_NAME.contains('duckdns.org')) {
+                        error "Use a DuckDNS domain (e.g. techbleat-market.duckdns.org). Create at duckdns.org and add credential duckdns-token."
+                    }
                 }
-
                 withCredentials([
                     sshUserPrivateKey(
                         credentialsId: 'techbleat-ec2-key',
                         keyFileVariable: 'SSH_KEY_PATH'
                     )
                 ]) {
-
                     sh """
-                    set -e
+                        set -e
+                        cd techbleat-devops/terraform
+                        EC2_IP=\$(terraform output -raw server_public_ip)
+                        DB_URL=\$(terraform output -raw database_url)
+                        cd ../..
+                        DOMAIN="${params.DOMAIN_NAME}"
+                        SSH_OPTS="-i \$SSH_KEY_PATH -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-                    cd techbleat-devops/terraform
-                    EC2_IP=\$(terraform output -raw server_public_ip)
-                    DB_URL=\$(terraform output -raw database_url)
-                    TF_DOMAIN=\$(terraform output -raw domain_name 2>/dev/null || true)
+                        echo "Deploying to \$EC2_IP (domain: \$DOMAIN) ..."
 
-                    cd ../..
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /home/ec2-user/app"
 
-                    DOMAIN=\${TF_DOMAIN:-${params.DOMAIN_NAME}}
-                    CERT_EMAIL="${params.CERTBOT_EMAIL}"
+                        rsync -avz -e "ssh \$SSH_OPTS" \\
+                          --exclude venv --exclude __pycache__ --exclude .git \\
+                          backend-api/ ec2-user@\$EC2_IP:/home/ec2-user/app/
 
-                    SSH_OPTS="-i \$SSH_KEY_PATH -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+                        echo "DATABASE_URL=\$DB_URL" > /tmp/app.env
+                        scp \$SSH_OPTS /tmp/app.env ec2-user@\$EC2_IP:/home/ec2-user/app/.env
+                        rm -f /tmp/app.env
 
-                    echo "Deploying to \$EC2_IP (domain: \$DOMAIN)..."
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /tmp/frontend-deploy"
+                        rsync -avz -e "ssh \$SSH_OPTS" \\
+                          --exclude nginx.conf_sample --exclude techbleat.conf \\
+                          frontend/ ec2-user@\$EC2_IP:/tmp/frontend-deploy/
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /home/ec2-user/app"
+                        scp \$SSH_OPTS techbleat-devops/nginx/techbleat.conf ec2-user@\$EC2_IP:/tmp/techbleat.conf
+                        scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
 
-                    rsync -avz -e "ssh \$SSH_OPTS" \\
-                    --exclude venv --exclude __pycache__ --exclude .git \\
-                    backend-api/ ec2-user@\$EC2_IP:/home/ec2-user/app/
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras install nginx1 -y 2>/dev/null || sudo yum install -y nginx"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx && sudo systemctl start nginx"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp -r /tmp/frontend-deploy/* /usr/share/nginx/html/"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/techbleat.conf /etc/nginx/conf.d/techbleat.conf"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "cd /home/ec2-user/app && python3 -m venv venv 2>/dev/null || true && ./venv/bin/pip install -r requirements.txt -q"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/fastapi.service /etc/systemd/system/fastapi.service && sudo systemctl daemon-reload"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable fastapi && sudo systemctl restart fastapi 2>/dev/null || sudo systemctl start fastapi"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart nginx"
 
-                    echo "DATABASE_URL=\$DB_URL" > /tmp/app.env
-                    scp \$SSH_OPTS /tmp/app.env ec2-user@\$EC2_IP:/home/ec2-user/app/.env
-                    rm -f /tmp/app.env
+                        echo "Setting up Nginx for \$DOMAIN ..."
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i 's/server_name _/server_name '\$DOMAIN'/' /etc/nginx/conf.d/techbleat.conf"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "mkdir -p /tmp/frontend-deploy"
+                        echo "Installing Certbot (Amazon Linux 2 compatible) ..."
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras enable epel 2>/dev/null || true"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release 2>/dev/null || true"
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
 
-                    rsync -avz -e "ssh \$SSH_OPTS" \\
-                    frontend/ ec2-user@\$EC2_IP:/tmp/frontend-deploy/
+                        echo "Waiting 45s for DNS propagation before Certbot ..."
+                        sleep 45
 
-                    scp \$SSH_OPTS techbleat-devops/nginx/techbleat.conf ec2-user@\$EC2_IP:/tmp/techbleat.conf
-                    scp \$SSH_OPTS techbleat-devops/backend/fastapi.service ec2-user@\$EC2_IP:/tmp/fastapi.service
+                        echo "Requesting Let's Encrypt certificate for \$DOMAIN ..."
+                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
 
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras install nginx1 -y"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y python3 python3-pip"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable nginx"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl start nginx"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp -r /tmp/frontend-deploy/* /usr/share/nginx/html/"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/techbleat.conf /etc/nginx/conf.d/techbleat.conf"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "cd /home/ec2-user/app && python3 -m venv venv 2>/dev/null || true && ./venv/bin/pip install -r requirements.txt"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo cp /tmp/fastapi.service /etc/systemd/system/fastapi.service && sudo systemctl daemon-reload"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl enable fastapi"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart fastapi"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl restart nginx"
-
-                    echo "Setting up HTTPS for \$DOMAIN"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo sed -i 's/server_name _/server_name \$DOMAIN/' /etc/nginx/conf.d/techbleat.conf"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo systemctl reload nginx"
-
-                    # FINAL CERTBOT FIX
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo amazon-linux-extras enable epel"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y epel-release"
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo yum install -y certbot python2-certbot-nginx"
-
-                    ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m \$CERT_EMAIL"
-
-                    echo "Deployment complete"
-                    echo "Visit: https://\$DOMAIN"
+                        echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
                     """
                 }
             }
@@ -154,15 +160,12 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'Pipeline completed successfully'
-
             dir('techbleat-devops/terraform') {
                 sh 'terraform output'
             }
         }
-
         failure {
             echo 'Pipeline failed - check logs'
         }
