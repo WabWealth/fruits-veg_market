@@ -961,7 +961,7 @@ function renderProducts() {
 
 async function loadProducts() {
   try {
-    const res = await fetch("http://localhost:8000/api/products");
+    const res = await fetch("/api/products");
     products = await res.json();
     renderProducts();
   } catch (err) {
@@ -1208,7 +1208,7 @@ grid.addEventListener("click", (e) => {
           const line = p.price * qty;
           return `
             <div class="cartItem" data-id="${id}">
-              <img src="${p.img}" alt="${p.name}" loading="lazy" />
+              <img src="${p.image}" alt="${p.name}" loading="lazy" />
               <div>
                 <h4>${p.name}</h4>
                 <p>${money(p.price)} • ${p.unit}</p>
