@@ -151,10 +151,24 @@ pipeline {
 
                         echo "Requesting Let's Encrypt certificate for \$DOMAIN ..."
                         if ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"; then
-                          echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
+                          echo ""
+                          echo "=============================================="
+                          echo "PRODUCTION READY - HTTPS"
+                          echo "=============================================="
+                          echo "Site: https://\$DOMAIN"
+                          echo "API:  https://\$DOMAIN/api/products"
+                          echo "=============================================="
                         else
-                          echo "Certbot failed (Let's Encrypt DNS validation). Site works over HTTP."
-                          echo "Visit http://\$DOMAIN or http://\$EC2_IP and http://\$EC2_IP/api/products"
+                          echo ""
+                          echo "=============================================="
+                          echo "PRODUCTION READY - HTTP (domain name)"
+                          echo "=============================================="
+                          echo "Site: http://\$DOMAIN"
+                          echo "API:  http://\$DOMAIN/api/products"
+                          echo ""
+                          echo "Use the domain above for production - not the IP."
+                          echo "HTTPS: retry pipeline later when Let's Encrypt DNS is stable."
+                          echo "=============================================="
                         fi
                     """
                 }
@@ -165,6 +179,15 @@ pipeline {
     post {
         success {
             echo 'Pipeline completed successfully'
+            script {
+                def domain = params.DOMAIN_NAME?.trim() ?: 'techbleat-market.duckdns.org'
+                echo ""
+                echo "=============================================="
+                echo "PRODUCTION URL (use this, not the IP):"
+                echo "  http://${domain}"
+                echo "  http://${domain}/api/products"
+                echo "=============================================="
+            }
             dir('techbleat-devops/terraform') {
                 sh 'terraform output'
             }

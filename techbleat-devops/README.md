@@ -82,6 +82,17 @@ All deployment logic is **inline in the Jenkinsfile** – no external scripts. U
 2. Add Jenkins credential: **Secret text**, ID: `duckdns-token`, value: your DuckDNS token
 3. Run with `DOMAIN_NAME=techbleat-market.duckdns.org` – pipeline auto-updates IP before Certbot
 
+## Production URL
+
+**Use the domain name, not the IP.** After deployment:
+
+| Use (production) | Avoid |
+|------------------|-------|
+| `http://techbleat-market.duckdns.org` | `http://54.246.163.138` |
+| `http://techbleat-market.duckdns.org/api/products` | IP-based URLs |
+
+The pipeline outputs the production URL. Share the domain with users – it is stable and production-ready. If Certbot succeeds, use `https://` instead.
+
 ## Customize
 
 Edit `terraform/variables.tf` to change:
