@@ -150,9 +150,12 @@ pipeline {
                         sleep 90
 
                         echo "Requesting Let's Encrypt certificate for \$DOMAIN ..."
-                        ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}" || sleep 60 && ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"
-
-                        echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
+                        if ssh \$SSH_OPTS ec2-user@\$EC2_IP "sudo certbot --nginx -d \$DOMAIN --non-interactive --agree-tos -m ${params.CERTBOT_EMAIL}"; then
+                          echo "Done. Visit https://\$DOMAIN and https://\$DOMAIN/api/products"
+                        else
+                          echo "Certbot failed (Let's Encrypt DNS validation). Site works over HTTP."
+                          echo "Visit http://\$DOMAIN or http://\$EC2_IP and http://\$EC2_IP/api/products"
+                        fi
                     """
                 }
             }
