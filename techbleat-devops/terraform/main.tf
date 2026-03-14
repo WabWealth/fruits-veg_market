@@ -256,31 +256,3 @@ resource "aws_instance" "techbleat_server" {
     Name = "techbleat-superstore"
   }
 }
-
-# -----------------------------------------------------------------------------
-# Route53 DNS (fully automated - create zone + A record when domain_name set)
-# -----------------------------------------------------------------------------
-locals {
-  root_domain = var.domain_name != "" ? join(".", slice(split(".", var.domain_name), 1, length(split(".", var.domain_name)))) : ""
-  create_zone = var.domain_name != "" && var.route53_zone_id == ""
-  zone_id     = local.create_zone ? aws_route53_zone.main[0].zone_id : var.route53_zone_id
-}
-
-resource "aws_route53_zone" "main" {
-  count   = local.create_zone ? 1 : 0
-  name    = local.root_domain
-  comment = "Techbleat Superstore - created by Terraform"
-
-  tags = {
-    Name = "techbleat-zone"
-  }
-}
-
-resource "aws_route53_record" "app" {
-  count   = var.domain_name != "" ? 1 : 0
-  zone_id = local.zone_id
-  name    = split(".", var.domain_name)[0]
-  type    = "A"
-  ttl     = 300
-  records = [aws_instance.techbleat_server.public_ip]
-}
