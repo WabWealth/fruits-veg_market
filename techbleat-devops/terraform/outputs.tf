@@ -32,8 +32,3 @@ output "domain_name" {
   description = "App domain (for Jenkins)"
   value       = var.domain_name
 }
-
-output "route53_nameservers" {
-  description = "Set these nameservers at your domain registrar (one-time). Skip if domain registered in Route53."
-  value       = local.create_zone ? aws_route53_zone.main[0].name_servers : []
-}
